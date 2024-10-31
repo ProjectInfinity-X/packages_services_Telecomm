@@ -133,8 +133,7 @@ public class Ringer {
     @VisibleForTesting
     public static final int[] PULSE_AMPLITUDE;
 
-    private static final int RAMPING_RINGER_VIBRATION_DURATION = 5000;
-    private static final int RAMPING_RINGER_DURATION = 10000;
+    private static final int RAMPING_RINGER_DURATION_DEFAULT = 10000;
 
     private int mRampingRingerDuration = -1;  // ramping ringer duration in millisecond
     private float mRampingRingerStartVolume = 0f;
@@ -457,16 +456,29 @@ public class Ringer {
                 // request the custom ringtone from the call and expect it to be current.
                 if (shouldApplyRampingRinger) {
                     Log.i(this, "create ramping ringer.");
-                    float silencePoint = (float) (RAMPING_RINGER_VIBRATION_DURATION)
-                            / (float) (RAMPING_RINGER_VIBRATION_DURATION + RAMPING_RINGER_DURATION);
+                    final float startingVolume = (float) Settings.System.getIntForUser(
+                            mContext.getContentResolver(),
+                            Settings.System.RAMPING_RINGER_START_VOLUME, 0,
+                            UserHandle.USER_CURRENT) / 100f; // percent to fraction
+                    final int duration = Settings.System.getIntForUser(
+                            mContext.getContentResolver(),
+                            Settings.System.RAMPING_RINGER_DURATION,
+                            RAMPING_RINGER_DURATION_DEFAULT,
+                            UserHandle.USER_CURRENT) * 1000; // s to ms
+                    final boolean noSilence = Settings.System.getIntForUser(
+                            mContext.getContentResolver(),
+                            Settings.System.RAMPING_RINGER_NO_SILENCE,
+                            RAMPING_RINGER_DURATION_DEFAULT,
+                            UserHandle.USER_CURRENT) == 1;
+                    final float vibDuration = noSilence ? 0 : (float) duration / 2f;
+                    final float silencePoint = (float) (vibDuration) / (vibDuration + (float) duration);
                     mVolumeShaperConfig =
                             new VolumeShaper.Configuration.Builder()
-                                    .setDuration(RAMPING_RINGER_VIBRATION_DURATION
-                                            + RAMPING_RINGER_DURATION)
+                                    .setDuration((long) (vibDuration + (float) duration))
                                     .setCurve(
                                             new float[]{0.f, silencePoint + EPSILON
                                                     /*keep monotonicity*/, 1.f},
-                                            new float[]{0.f, 0.f, 1.f})
+                                            new float[]{0.f, startingVolume, 1.f})
                                     .setInterpolatorType(
                                             VolumeShaper.Configuration.INTERPOLATOR_TYPE_LINEAR)
                                     .build();
