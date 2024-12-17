@@ -144,6 +144,12 @@ public class CallAudioManager extends CallsManagerListenerBase {
         updateForegroundCall();
         if (shouldPlayDisconnectTone(oldState, newState)) {
             playToneForDisconnectedCall(call);
+        } else {
+            if (newState == CallState.DISCONNECTED) {
+                // This call is not disconnected, but it won't generate a disconnect tone, so
+                // complete the future to ensure we unbind from BT promptly.
+                completeDisconnectToneFuture(call);
+            }
         }
 
         onCallLeavingState(call, oldState);
@@ -438,6 +444,10 @@ public class CallAudioManager extends CallsManagerListenerBase {
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void onRingerModeChange() {
+        if (mFeatureFlags.ensureInCarRinging()) {
+            // Stop the current ringtone before attempting to start the new ringtone:
+            stopRinging();
+        }
         mCallAudioModeStateMachine.sendMessageWithArgs(
                 CallAudioModeStateMachine.RINGER_MODE_CHANGE, makeArgsForModeStateMachine());
     }
@@ -576,8 +586,25 @@ public class CallAudioManager extends CallsManagerListenerBase {
 
     @VisibleForTesting
     public void setCallAudioRouteFocusState(int focusState) {
-        mCallAudioRouteAdapter.sendMessageWithSessionInfo(
-                CallAudioRouteStateMachine.SWITCH_FOCUS, focusState);
+        if (mFeatureFlags.useRefactoredAudioRouteSwitching()) {
+            mCallAudioRouteAdapter.sendMessageWithSessionInfo(
+                    CallAudioRouteStateMachine.SWITCH_FOCUS, focusState, 0);
+        } else {
+            mCallAudioRouteAdapter.sendMessageWithSessionInfo(
+                    CallAudioRouteStateMachine.SWITCH_FOCUS, focusState);
+        }
+    }
+
+    public void setCallAudioRouteFocusStateForEndTone() {
+        if (mFeatureFlags.useRefactoredAudioRouteSwitching()) {
+            mCallAudioRouteAdapter.sendMessageWithSessionInfo(
+                    CallAudioRouteStateMachine.SWITCH_FOCUS,
+                    CallAudioRouteStateMachine.ACTIVE_FOCUS, 1);
+        } else {
+            mCallAudioRouteAdapter.sendMessageWithSessionInfo(
+                    CallAudioRouteStateMachine.SWITCH_FOCUS,
+                    CallAudioRouteStateMachine.ACTIVE_FOCUS);
+        }
     }
 
     public void notifyAudioOperationsComplete() {
@@ -1068,6 +1095,10 @@ public class CallAudioManager extends CallsManagerListenerBase {
         CompletableFuture<Void> disconnectedToneFuture = mCallsManager.getInCallController()
                 .getDisconnectedToneBtFutures().get(call.getId());
         if (disconnectedToneFuture != null) {
+            Log.i(this,
+                    "completeDisconnectToneFuture: completing deferred disconnect tone future for"
+                            + " call %s",
+                    call.getId());
             disconnectedToneFuture.complete(null);
         }
     }

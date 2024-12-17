@@ -70,7 +70,7 @@ public class AudioRoute {
                 return;
             }
 
-            Log.i(this, "creating AudioRoute with type %s and address %s, retry count %d",
+            Log.i(this, "createRetry; type=%s, address=%s, retryCount=%d",
                     DEVICE_TYPE_STRINGS.get(type), bluetoothAddress, retryCount);
             AudioDeviceInfo routeInfo = null;
             List<AudioDeviceInfo> infos = audioManager.getAvailableCommunicationDevices();
@@ -117,6 +117,8 @@ public class AudioRoute {
     public static final int TYPE_BLUETOOTH_HA = 6;
     public static final int TYPE_BLUETOOTH_LE = 7;
     public static final int TYPE_STREAMING = 8;
+    // Used by auto
+    public static final int TYPE_BUS = 9;
     @IntDef(prefix = "TYPE", value = {
             TYPE_INVALID,
             TYPE_EARPIECE,
@@ -126,7 +128,8 @@ public class AudioRoute {
             TYPE_BLUETOOTH_SCO,
             TYPE_BLUETOOTH_HA,
             TYPE_BLUETOOTH_LE,
-            TYPE_STREAMING
+            TYPE_STREAMING,
+            TYPE_BUS
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface AudioRouteType {}
@@ -134,6 +137,7 @@ public class AudioRoute {
     private @AudioRouteType int mAudioRouteType;
     private String mBluetoothAddress;
     private AudioDeviceInfo mInfo;
+    private boolean mIsDestRouteForWatch;
     public static final Set<Integer> BT_AUDIO_DEVICE_INFO_TYPES = Set.of(
             AudioDeviceInfo.TYPE_BLE_HEADSET,
             AudioDeviceInfo.TYPE_BLE_SPEAKER,
@@ -155,35 +159,38 @@ public class AudioRoute {
         DEVICE_TYPE_STRINGS.put(TYPE_WIRED, "TYPE_WIRED_HEADSET");
         DEVICE_TYPE_STRINGS.put(TYPE_SPEAKER, "TYPE_SPEAKER");
         DEVICE_TYPE_STRINGS.put(TYPE_DOCK, "TYPE_DOCK");
+        DEVICE_TYPE_STRINGS.put(TYPE_BUS, "TYPE_BUS");
         DEVICE_TYPE_STRINGS.put(TYPE_BLUETOOTH_SCO, "TYPE_BLUETOOTH_SCO");
         DEVICE_TYPE_STRINGS.put(TYPE_BLUETOOTH_HA, "TYPE_BLUETOOTH_HA");
         DEVICE_TYPE_STRINGS.put(TYPE_BLUETOOTH_LE, "TYPE_BLUETOOTH_LE");
         DEVICE_TYPE_STRINGS.put(TYPE_STREAMING, "TYPE_STREAMING");
     }
 
-    public static final HashMap<Integer, Integer> DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE;
+    public static final HashMap<Integer, Integer> DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE;
     static {
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE = new HashMap<>();
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE = new HashMap<>();
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
                 TYPE_EARPIECE);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, TYPE_SPEAKER);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_WIRED_HEADSET, TYPE_WIRED);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_WIRED_HEADPHONES, TYPE_WIRED);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+                TYPE_SPEAKER);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_WIRED_HEADSET, TYPE_WIRED);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_WIRED_HEADPHONES, TYPE_WIRED);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
                 TYPE_BLUETOOTH_SCO);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_USB_DEVICE, TYPE_WIRED);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_USB_ACCESSORY, TYPE_WIRED);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_DOCK, TYPE_DOCK);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_USB_HEADSET, TYPE_WIRED);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_HEARING_AID,
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_USB_DEVICE, TYPE_WIRED);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_USB_ACCESSORY, TYPE_WIRED);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_DOCK, TYPE_DOCK);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_USB_HEADSET, TYPE_WIRED);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_HEARING_AID,
                 TYPE_BLUETOOTH_HA);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLE_HEADSET,
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLE_HEADSET,
                 TYPE_BLUETOOTH_LE);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLE_SPEAKER,
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLE_SPEAKER,
                 TYPE_BLUETOOTH_LE);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLE_BROADCAST,
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BLE_BROADCAST,
                 TYPE_BLUETOOTH_LE);
-        DEVICE_INFO_TYPETO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_DOCK_ANALOG, TYPE_DOCK);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_DOCK_ANALOG, TYPE_DOCK);
+        DEVICE_INFO_TYPE_TO_AUDIO_ROUTE_TYPE.put(AudioDeviceInfo.TYPE_BUS, TYPE_BUS);
     }
 
     private static final HashMap<Integer, List<Integer>> AUDIO_ROUTE_TYPE_TO_DEVICE_INFO_TYPE;
@@ -210,6 +217,10 @@ public class AudioRoute {
         dockDeviceInfoTypes.add(AudioDeviceInfo.TYPE_DOCK_ANALOG);
         AUDIO_ROUTE_TYPE_TO_DEVICE_INFO_TYPE.put(TYPE_DOCK, dockDeviceInfoTypes);
 
+        List<Integer> busDeviceInfoTypes = new ArrayList<>();
+        busDeviceInfoTypes.add(AudioDeviceInfo.TYPE_BUS);
+        AUDIO_ROUTE_TYPE_TO_DEVICE_INFO_TYPE.put(TYPE_BUS, busDeviceInfoTypes);
+
         List<Integer> bluetoothScoDeviceInfoTypes = new ArrayList<>();
         bluetoothScoDeviceInfoTypes.add(AudioDeviceInfo.TYPE_BLUETOOTH_A2DP);
         bluetoothScoDeviceInfoTypes.add(AudioDeviceInfo.TYPE_BLUETOOTH_SCO);
@@ -231,6 +242,10 @@ public class AudioRoute {
         return mAudioRouteType;
     }
 
+    public boolean isWatch() {
+        return mIsDestRouteForWatch;
+    }
+
     String getBluetoothAddress() {
         return mBluetoothAddress;
     }
@@ -239,7 +254,8 @@ public class AudioRoute {
     void onDestRouteAsPendingRoute(boolean active, PendingAudioRoute pendingAudioRoute,
             BluetoothDevice device, AudioManager audioManager,
             BluetoothRouteManager bluetoothRouteManager, boolean isScoAudioConnected) {
-        Log.i(this, "onDestRouteAsPendingRoute: active (%b), type (%d)", active, mAudioRouteType);
+        Log.i(this, "onDestRouteAsPendingRoute: active (%b), type (%s)", active,
+                DEVICE_TYPE_STRINGS.get(mAudioRouteType));
         if (pendingAudioRoute.isActive() && !active) {
             clearCommunicationDevice(pendingAudioRoute, bluetoothRouteManager, audioManager);
         } else if (active) {
@@ -249,6 +265,8 @@ public class AudioRoute {
                         audioManager, bluetoothRouteManager);
                 // Special handling for SCO case.
                 if (mAudioRouteType == TYPE_BLUETOOTH_SCO) {
+                    // Set whether the dest route is for the watch
+                    mIsDestRouteForWatch = bluetoothRouteManager.isWatch(device);
                     // Check if the communication device was set for the device, even if
                     // BluetoothHeadset#connectAudio reports that the SCO connection wasn't
                     // successfully established.
@@ -281,8 +299,8 @@ public class AudioRoute {
                     if (result) {
                         pendingAudioRoute.setCommunicationDeviceType(mAudioRouteType);
                     }
-                    Log.i(this, "Result of setting communication device for audio "
-                            + "route (%s) - %b", this, result);
+                    Log.i(this, "onDestRouteAsPendingRoute: route=%s, "
+                            + "AudioManager#setCommunicationDevice()=%b", this, result);
                     break;
                 }
             }
@@ -380,11 +398,11 @@ public class AudioRoute {
 
         int result = BluetoothStatusCodes.SUCCESS;
         if (pendingAudioRoute.getCommunicationDeviceType() == TYPE_BLUETOOTH_SCO) {
-            Log.i(this, "Disconnecting SCO device.");
+            Log.i(this, "clearCommunicationDevice: Disconnecting SCO device.");
             result = bluetoothRouteManager.getDeviceManager().disconnectSco();
         } else {
-            Log.i(this, "Clearing communication device for audio type %d.",
-                    pendingAudioRoute.getCommunicationDeviceType());
+            Log.i(this, "clearCommunicationDevice: AudioManager#clearCommunicationDevice, type=%s",
+                    DEVICE_TYPE_STRINGS.get(pendingAudioRoute.getCommunicationDeviceType()));
             audioManager.clearCommunicationDevice();
         }
 

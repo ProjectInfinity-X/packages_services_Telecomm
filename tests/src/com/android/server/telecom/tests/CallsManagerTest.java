@@ -59,7 +59,6 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.os.OutcomeReceiver;
 import android.os.Process;
@@ -88,7 +87,6 @@ import android.widget.Toast;
 import androidx.test.filters.MediumTest;
 import androidx.test.filters.SmallTest;
 
-import com.android.internal.telecom.IConnectionService;
 import com.android.server.telecom.AnomalyReporterAdapter;
 import com.android.server.telecom.AsyncRingtonePlayer;
 import com.android.server.telecom.Call;
@@ -107,7 +105,6 @@ import com.android.server.telecom.ClockProxy;
 import com.android.server.telecom.ConnectionServiceFocusManager;
 import com.android.server.telecom.ConnectionServiceFocusManager.ConnectionServiceFocusManagerFactory;
 import com.android.server.telecom.ConnectionServiceWrapper;
-import com.android.server.telecom.CreateConnectionResponse;
 import com.android.server.telecom.DefaultDialerCache;
 import com.android.server.telecom.EmergencyCallDiagnosticLogger;
 import com.android.server.telecom.EmergencyCallHelper;
@@ -137,6 +134,7 @@ import com.android.server.telecom.callfiltering.BlockedNumbersAdapter;
 import com.android.server.telecom.callfiltering.CallFilteringResult;
 import com.android.server.telecom.flags.FeatureFlags;
 import com.android.server.telecom.callfiltering.IncomingCallFilterGraph;
+import com.android.server.telecom.metrics.TelecomMetricsController;
 import com.android.server.telecom.ui.AudioProcessingNotification;
 import com.android.server.telecom.ui.CallStreamingNotification;
 import com.android.server.telecom.ui.DisconnectedCallNotifier;
@@ -318,7 +316,7 @@ public class CallsManagerTest extends TelecomTestCase {
     @Mock private IncomingCallFilterGraph mIncomingCallFilterGraph;
     @Mock private Context mMockCreateContextAsUser;
     @Mock private UserManager mMockCurrentUserManager;
-    @Mock private IConnectionService mIConnectionService;
+    @Mock private TelecomMetricsController mMockTelecomMetricsController;
     private CallsManager mCallsManager;
 
     @Override
@@ -396,7 +394,9 @@ public class CallsManagerTest extends TelecomTestCase {
                 mBluetoothDeviceManager,
                 mFeatureFlags,
                 mTelephonyFlags,
-                (call, listener, context, timeoutsAdapter, lock) -> mIncomingCallFilterGraph);
+                (call, listener, context, timeoutsAdapter,
+                        mFeatureFlags, lock) -> mIncomingCallFilterGraph,
+                mMockTelecomMetricsController);
 
         when(mPhoneAccountRegistrar.getPhoneAccount(
                 eq(SELF_MANAGED_HANDLE), any())).thenReturn(SELF_MANAGED_ACCOUNT);
@@ -416,17 +416,11 @@ public class CallsManagerTest extends TelecomTestCase {
                 .thenReturn(mMockCreateContextAsUser);
         when(mMockCreateContextAsUser.getSystemService(UserManager.class))
                 .thenReturn(mMockCurrentUserManager);
-        when(mIConnectionService.asBinder()).thenReturn(mock(IBinder.class));
-
-        mComponentContextFixture.addConnectionService(
-                SIM_1_ACCOUNT.getAccountHandle().getComponentName(), mIConnectionService);
     }
 
     @Override
     @After
     public void tearDown() throws Exception {
-        mComponentContextFixture.removeConnectionService(
-                SIM_1_ACCOUNT.getAccountHandle().getComponentName(), mIConnectionService);
         super.tearDown();
     }
 
@@ -3245,35 +3239,6 @@ public class CallsManagerTest extends TelecomTestCase {
 
         String result = resultFuture.get(1000L, TimeUnit.MILLISECONDS);
         assertTrue(result.contains("onReceiveResult"));
-    }
-
-    @Test
-    public void testConnectionServiceCreateConnectionTimeout() throws Exception {
-        ConnectionServiceWrapper service = new ConnectionServiceWrapper(
-                SIM_1_ACCOUNT.getAccountHandle().getComponentName(), null,
-                mPhoneAccountRegistrar, mCallsManager, mContext, mLock, null, mFeatureFlags);
-        TestScheduledExecutorService scheduledExecutorService = new TestScheduledExecutorService();
-        service.setScheduledExecutorService(scheduledExecutorService);
-        Call call = addSpyCall();
-        service.addCall(call);
-        when(call.isCreateConnectionComplete()).thenReturn(false);
-        CreateConnectionResponse response = mock(CreateConnectionResponse.class);
-
-        service.createConnection(call, response);
-        waitUntilConditionIsTrueOrTimeout(new Condition() {
-            @Override
-            public Object expected() {
-                return true;
-            }
-
-            @Override
-            public Object actual() {
-                return scheduledExecutorService.isRunnableScheduledAtTime(15000L);
-            }
-        }, 5000L, "Expected job failed to schedule");
-        scheduledExecutorService.advanceTime(15000L);
-        verify(response).handleCreateConnectionFailure(
-                eq(new DisconnectCause(DisconnectCause.ERROR)));
     }
 
     @SmallTest

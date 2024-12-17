@@ -1685,6 +1685,10 @@ public class CallAudioRouteStateMachine extends StateMachine implements CallAudi
         sendMessage(message, arg, 0, args);
     }
 
+    public void sendMessageWithSessionInfo(int message, int arg, int data) {
+        // ignore, only used in CallAudioRouteController
+    }
+
     public void sendMessageWithSessionInfo(int message, int arg, BluetoothDevice bluetoothDevice) {
         // ignore, only used in CallAudioRouteController
     }
@@ -2106,8 +2110,9 @@ public class CallAudioRouteStateMachine extends StateMachine implements CallAudi
     private int getCurrentCallSupportedRoutes() {
         int supportedRoutes = CallAudioState.ROUTE_ALL;
 
-        if (mCallsManager.getForegroundCall() != null) {
-            supportedRoutes &= mCallsManager.getForegroundCall().getSupportedAudioRoutes();
+        Call foregroundCall = mCallsManager.getForegroundCall();
+        if (foregroundCall != null) {
+            supportedRoutes &= foregroundCall.getSupportedAudioRoutes();
         }
 
         return supportedRoutes;

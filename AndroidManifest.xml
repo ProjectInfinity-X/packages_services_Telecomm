@@ -45,6 +45,8 @@
     <!-- Required to determine source of ongoing audio recordings. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING"/>
     <uses-permission android:name="android.permission.MODIFY_PHONE_STATE"/>
+    <!-- Required to query the audio framework to determine if a notification sound should play. -->
+    <uses-permission android:name="android.permission.QUERY_AUDIO_STATE"/>
     <uses-permission android:name="android.permission.READ_CALL_LOG"/>
     <!-- Required to check for direct to voicemail, to load custom ringtones for incoming calls
         which are specified on a per contact basis, and also to determine user preferred
@@ -66,7 +68,6 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.ACCESS_LAST_KNOWN_CELL_ID"/>
     <uses-permission android:name="android.permission.STATUS_BAR_SERVICE" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" />
 
     <permission android:name="android.permission.BROADCAST_CALLLOG_INFO"
          android:label="Broadcast the call type/duration information"
@@ -136,7 +137,7 @@
                          contacts provider entries. Any data not fitting the schema described is ignored. -->
         <activity android:name=".components.UserCallActivity"
              android:label="@string/userCallActivityLabel"
-             android:theme="@style/Theme.Telecomm.Transparent"
+             android:theme="@style/Theme.Telecomm.UserCallActivityNoSplash"
              android:permission="android.permission.CALL_PHONE"
              android:excludeFromRecents="true"
              android:process=":ui"

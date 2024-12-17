@@ -3,6 +3,13 @@ container: "system"
 
 # OWNER=tjstuart TARGET=24Q3
 flag {
+  name: "prevent_redundant_location_permission_grant_and_revoke"
+  namespace: "telecom"
+  description: "avoid redundant action of grant and revoke location permission for multiple emergency calls"
+  bug: "345386002"
+}
+
+flag {
   name: "transactional_cs_verifier"
   namespace: "telecom"
   description: "verify connection service callbacks via a transaction"
@@ -16,12 +23,45 @@ flag {
   bug: "321369729"
 }
 
+# OWNER=breadley TARGET=24Q4
+flag {
+  name: "cache_call_events"
+  namespace: "telecom"
+  description: "Cache call events to wait for the ServiceWrapper to be set"
+  bug: "364311190"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
 # OWNER = breadley TARGET=24Q3
 flag {
   name: "cancel_removal_on_emergency_redial"
   namespace: "telecom"
   description: "When redialing an emergency call on another connection service, ensure any pending removal operation is cancelled"
   bug: "341157874"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+# OWNER=breadley TARGET=24Q4
+flag {
+  name: "use_stream_voice_call_tones"
+  namespace: "telecom"
+  description: "Use STREAM_VOICE_CALL only for ToneGenerator"
+  bug: "363262590"
+  metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+# OWNER=tjstuart TARGET=25Q1
+flag {
+  name: "remap_transactional_capabilities"
+  namespace: "telecom"
+  description: "Transactional call capabilities need to be remapped to Connection capabilities"
+  bug: "366063695"
   metadata {
       purpose: PURPOSE_BUGFIX
     }

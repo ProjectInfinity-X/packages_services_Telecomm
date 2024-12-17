@@ -43,8 +43,8 @@
     <string name="respond_via_sms_setting_title_2" msgid="4914853536609553457">"હાજરજવાબમાં ફેરફાર કરો"</string>
     <string name="respond_via_sms_setting_summary" msgid="8054571501085436868"></string>
     <string name="respond_via_sms_edittext_dialog_title" msgid="6579353156073272157">"ઝડપી પ્રતિસાદ"</string>
-    <string name="respond_via_sms_confirmation_format" msgid="2932395476561267842">"<xliff:g id="PHONE_NUMBER">%s</xliff:g> પર સંદેશ મોકલ્યો."</string>
-    <string name="respond_via_sms_failure_format" msgid="5198680980054596391">"<xliff:g id="PHONE_NUMBER">%s</xliff:g>ને સંદેશ મોકલવામાં નિષ્ફળ રહ્યાં."</string>
+    <string name="respond_via_sms_confirmation_format" msgid="2932395476561267842">"<xliff:g id="PHONE_NUMBER">%s</xliff:g> પર મેસેજ મોકલ્યો."</string>
+    <string name="respond_via_sms_failure_format" msgid="5198680980054596391">"<xliff:g id="PHONE_NUMBER">%s</xliff:g> પર મેસેજ મોકલવામાં નિષ્ફળ રહ્યાં."</string>
     <string name="enable_account_preference_title" msgid="6949224486748457976">"કૉલ કરવા માટેના એકાઉન્ટ"</string>
     <string name="outgoing_call_not_allowed_user_restriction" msgid="3424338207838851646">"ફક્ત કટોકટીના કૉલ્સને મંજૂરી છે."</string>
     <string name="outgoing_call_not_allowed_no_permission" msgid="8590468836581488679">"ફોન પરવાનગી વિના આ ઍપ્લિકેશન આઉટગોઇંગ કૉલ્સ કરી શકતી નથી."</string>
@@ -90,7 +90,7 @@
     <string name="answering_ends_other_managed_video_call" msgid="1988508241432031327">"જવાબ આપવાથી તમારો ચાલુ વિડિઓ કૉલ સમાપ્ત થશે"</string>
     <string name="answer_incoming_call" msgid="2045888814782215326">"જવાબ આપો"</string>
     <string name="decline_incoming_call" msgid="922147089348451310">"નકારો"</string>
-    <string name="cant_call_due_to_no_supported_service" msgid="1635626384149947077">"કૉલ કરી શકાતો નથી કારણ કે આ પ્રકારના કૉલની સુવિધા આપતા હોય એવા કોઈ કૉલિંગ એકાઉન્ટ નથી."</string>
+    <string name="cant_call_due_to_no_supported_service" msgid="6720817368116820027">"કૉલ કરી શકતા નથી. તમારા ડિવાઇસનું કનેક્શન ચેક કરો."</string>
     <string name="cant_call_due_to_ongoing_call" msgid="8004235328451385493">"તમારા <xliff:g id="OTHER_CALL">%1$s</xliff:g> કૉલને કારણે કૉલ કરી શકતાં નથી."</string>
     <string name="cant_call_due_to_ongoing_calls" msgid="6379163795277824868">"તમારા <xliff:g id="OTHER_CALL">%1$s</xliff:g> કૉલને કારણે કૉલ કરી શકતાં નથી."</string>
     <string name="cant_call_due_to_ongoing_unknown_call" msgid="8243532328969433172">"અન્ય ઍપ્લિકેશનમાં કૉલને કારણે કૉલ કરી શકતાં નથી."</string>

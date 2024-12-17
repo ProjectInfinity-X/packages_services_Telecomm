@@ -27,6 +27,7 @@ import android.util.ArraySet;
 import android.util.Pair;
 
 import com.android.server.telecom.bluetooth.BluetoothRouteManager;
+import com.android.server.telecom.flags.FeatureFlags;
 
 import java.util.Set;
 
@@ -41,6 +42,7 @@ public class PendingAudioRoute {
     private CallAudioRouteController mCallAudioRouteController;
     private AudioManager mAudioManager;
     private BluetoothRouteManager mBluetoothRouteManager;
+    private FeatureFlags mFeatureFlags;
     /**
      * The {@link AudioRoute} that this pending audio switching started with
      */
@@ -58,10 +60,11 @@ public class PendingAudioRoute {
     private @AudioRoute.AudioRouteType int mCommunicationDeviceType = AudioRoute.TYPE_INVALID;
 
     PendingAudioRoute(CallAudioRouteController controller, AudioManager audioManager,
-            BluetoothRouteManager bluetoothRouteManager) {
+            BluetoothRouteManager bluetoothRouteManager, FeatureFlags featureFlags) {
         mCallAudioRouteController = controller;
         mAudioManager = audioManager;
         mBluetoothRouteManager = bluetoothRouteManager;
+        mFeatureFlags = featureFlags;
         mPendingMessages = new ArraySet<>();
         mActive = false;
         mCommunicationDeviceType = AudioRoute.TYPE_INVALID;
@@ -72,7 +75,7 @@ public class PendingAudioRoute {
         mOrigRoute = origRoute;
     }
 
-    AudioRoute getOrigRoute() {
+    public AudioRoute getOrigRoute() {
         return mOrigRoute;
     }
 
@@ -96,8 +99,12 @@ public class PendingAudioRoute {
         Log.i(this, "onMessageReceived: message - %s", message);
         if (message.first == PENDING_ROUTE_FAILED) {
             // Fallback to base route
-            mCallAudioRouteController.sendMessageWithSessionInfo(
-                    SWITCH_BASELINE_ROUTE, INCLUDE_BLUETOOTH_IN_BASELINE, btAddressToExclude);
+            if (mFeatureFlags.telecomMetricsSupport()) {
+                mCallAudioRouteController.fallBack(btAddressToExclude);
+            } else {
+                mCallAudioRouteController.sendMessageWithSessionInfo(
+                        SWITCH_BASELINE_ROUTE, INCLUDE_BLUETOOTH_IN_BASELINE, btAddressToExclude);
+            }
             return;
         }
 

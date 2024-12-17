@@ -75,7 +75,6 @@ import android.os.ResultReceiver;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.SystemVibrator;
-import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.BlockedNumberContract;
@@ -135,6 +134,7 @@ import com.android.server.telecom.callredirection.CallRedirectionProcessor;
 import com.android.server.telecom.components.ErrorDialogActivity;
 import com.android.server.telecom.components.TelecomBroadcastReceiver;
 import com.android.server.telecom.flags.FeatureFlags;
+import com.android.server.telecom.metrics.TelecomMetricsController;
 import com.android.server.telecom.stats.CallFailureCause;
 import com.android.server.telecom.ui.AudioProcessingNotification;
 import com.android.server.telecom.ui.CallRedirectionTimeoutDialogActivity;
@@ -444,6 +444,7 @@ public class CallsManager extends Call.ListenerBase
     private final InCallController mInCallController;
     private final CallDiagnosticServiceController mCallDiagnosticServiceController;
     private final CallAudioManager mCallAudioManager;
+    /** @deprecated not used any more */
     private final CallRecordingTonePlayer mCallRecordingTonePlayer;
     private RespondViaSmsManager mRespondViaSmsManager;
     private final Ringer mRinger;
@@ -616,7 +617,8 @@ public class CallsManager extends Call.ListenerBase
             BluetoothDeviceManager bluetoothDeviceManager,
             FeatureFlags featureFlags,
             com.android.internal.telephony.flags.FeatureFlags telephonyFlags,
-            IncomingCallFilterGraphProvider incomingCallFilterGraphProvider) {
+            IncomingCallFilterGraphProvider incomingCallFilterGraphProvider,
+            TelecomMetricsController metricsController) {
 
         mContext = context;
         mLock = lock;
@@ -659,7 +661,7 @@ public class CallsManager extends Call.ListenerBase
         } else {
             callAudioRouteAdapter = new CallAudioRouteController(context, this, audioServiceFactory,
                     new AudioRoute.Factory(), wiredHeadsetManager, mBluetoothRouteManager,
-                    statusBarNotifier, featureFlags);
+                    statusBarNotifier, featureFlags, metricsController);
         }
         callAudioRouteAdapter.initialize();
         bluetoothStateReceiver.setCallAudioRouteAdapter(callAudioRouteAdapter);
@@ -680,7 +682,7 @@ public class CallsManager extends Call.ListenerBase
                                         audioManager.generateAudioSessionId()));
         InCallTonePlayer.Factory playerFactory = new InCallTonePlayer.Factory(
                 callAudioRoutePeripheralAdapter, lock, toneGeneratorFactory, mediaPlayerFactory,
-                () -> audioManager.getStreamVolume(AudioManager.STREAM_RING) > 0);
+                () -> audioManager.getStreamVolume(AudioManager.STREAM_RING) > 0, featureFlags);
 
         SystemSettingsUtil systemSettingsUtil = new SystemSettingsUtil();
         RingtoneFactory ringtoneFactory = new RingtoneFactory(this, context, featureFlags);
@@ -696,8 +698,13 @@ public class CallsManager extends Call.ListenerBase
                 new Ringer.VibrationEffectProxy(), mInCallController,
                 mContext.getSystemService(NotificationManager.class),
                 accessibilityManagerAdapter, featureFlags);
-        mCallRecordingTonePlayer = new CallRecordingTonePlayer(mContext, audioManager,
-                mTimeoutsAdapter, mLock);
+        if (featureFlags.telecomResolveHiddenDependencies()) {
+            // This is now deprecated
+            mCallRecordingTonePlayer = null;
+        } else {
+            mCallRecordingTonePlayer = new CallRecordingTonePlayer(mContext, audioManager,
+                    mTimeoutsAdapter, mLock);
+        }
         mCallAudioManager = new CallAudioManager(callAudioRouteAdapter,
                 this, callAudioModeStateMachineFactory.create(systemStateHelper,
                 (AudioManager) mContext.getSystemService(Context.AUDIO_SERVICE),
@@ -742,7 +749,9 @@ public class CallsManager extends Call.ListenerBase
         mListeners.add(mCallEndpointController);
         mListeners.add(mCallDiagnosticServiceController);
         mListeners.add(mCallAudioManager);
-        mListeners.add(mCallRecordingTonePlayer);
+        if (!featureFlags.telecomResolveHiddenDependencies()) {
+            mListeners.add(mCallRecordingTonePlayer);
+        }
         mListeners.add(missedCallNotifier);
         mListeners.add(mDisconnectedCallNotifier);
         mListeners.add(mHeadsetMediaButton);
@@ -906,7 +915,7 @@ public class CallsManager extends Call.ListenerBase
         DndCallFilter dndCallFilter = new DndCallFilter(incomingHfpCall, mRinger);
         IncomingCallFilterGraph graph = mIncomingCallFilterGraphProvider.createGraph(
                 incomingHfpCall,
-                this::onCallFilteringComplete, mContext, mTimeoutsAdapter, mLock);
+                this::onCallFilteringComplete, mContext, mTimeoutsAdapter, mFeatureFlags, mLock);
         graph.addFilter(dndCallFilter);
         mGraphHandlerThreads.add(graph.getHandlerThread());
         return graph;
@@ -925,7 +934,7 @@ public class CallsManager extends Call.ListenerBase
         ParcelableCallUtils.Converter converter = new ParcelableCallUtils.Converter();
 
         IncomingCallFilterGraph graph = mIncomingCallFilterGraphProvider.createGraph(incomingCall,
-                this::onCallFilteringComplete, mContext, mTimeoutsAdapter, mLock);
+                this::onCallFilteringComplete, mContext, mTimeoutsAdapter, mFeatureFlags, mLock);
         DirectToVoicemailFilter voicemailFilter = new DirectToVoicemailFilter(incomingCall,
                 mCallerInfoLookupHelper);
         BlockCheckerFilter blockCheckerFilter = new BlockCheckerFilter(mContext, incomingCall,
@@ -1556,9 +1565,7 @@ public class CallsManager extends Call.ListenerBase
         if (extras.containsKey(TelecomManager.TRANSACTION_CALL_ID_KEY)) {
             call.setIsTransactionalCall(true);
             call.setCallingPackageIdentity(extras);
-            call.setConnectionCapabilities(
-                    extras.getInt(CallAttributes.CALL_CAPABILITIES_KEY,
-                            CallAttributes.SUPPORTS_SET_INACTIVE), true);
+            call.setTransactionalCapabilities(extras);
             call.setTargetPhoneAccount(phoneAccountHandle);
             if (extras.containsKey(CallAttributes.DISPLAY_NAME_KEY)) {
                 CharSequence displayName = extras.getCharSequence(CallAttributes.DISPLAY_NAME_KEY);
@@ -1910,9 +1917,7 @@ public class CallsManager extends Call.ListenerBase
             if (extras.containsKey(TelecomManager.TRANSACTION_CALL_ID_KEY)) {
                 call.setIsTransactionalCall(true);
                 call.setCallingPackageIdentity(extras);
-                call.setConnectionCapabilities(
-                        extras.getInt(CallAttributes.CALL_CAPABILITIES_KEY,
-                                CallAttributes.SUPPORTS_SET_INACTIVE), true);
+                call.setTransactionalCapabilities(extras);
                 if (extras.containsKey(CallAttributes.DISPLAY_NAME_KEY)) {
                     CharSequence displayName = extras.getCharSequence(
                             CallAttributes.DISPLAY_NAME_KEY);
@@ -2059,7 +2064,8 @@ public class CallsManager extends Call.ListenerBase
                         return CompletableFuture.completedFuture(
                                 Collections.singletonList(suggestion));
                     }
-                    return PhoneAccountSuggestionHelper.bindAndGetSuggestions(mContext,
+                    Context userContext = mContext.createContextAsUser(getCurrentUserHandle(), 0);
+                    return PhoneAccountSuggestionHelper.bindAndGetSuggestions(userContext,
                             finalCall.getHandle(), potentialPhoneAccounts);
                 }, new LoggedHandlerExecutor(outgoingCallHandler, "CM.cOCSS", mLock));
 
@@ -4621,7 +4627,6 @@ public class CallsManager extends Call.ListenerBase
             Log.i(this, "addCall(%s) is already added");
             return;
         }
-        Trace.beginSection("addCall");
         Log.i(this, "addCall(%s)", call);
         call.addListener(this);
         mCalls.add(call);
@@ -4638,20 +4643,12 @@ public class CallsManager extends Call.ListenerBase
         updateExternalCallCanPullSupport();
         // onCallAdded for calls which immediately take the foreground (like the first call).
         for (CallsManagerListener listener : mListeners) {
-            if (LogUtils.SYSTRACE_DEBUG) {
-                Trace.beginSection(listener.getClass().toString() + " addCall");
-            }
             listener.onCallAdded(call);
-            if (LogUtils.SYSTRACE_DEBUG) {
-                Trace.endSection();
-            }
         }
-        Trace.endSection();
     }
 
     @VisibleForTesting
     public void removeCall(Call call) {
-        Trace.beginSection("removeCall");
         Log.v(this, "removeCall(%s)", call);
 
         if (call.isTransactionalCall() && call.getTransactionServiceWrapper() != null) {
@@ -4678,16 +4675,9 @@ public class CallsManager extends Call.ListenerBase
             updateCanAddCall();
             updateHasActiveRttCall();
             for (CallsManagerListener listener : mListeners) {
-                if (LogUtils.SYSTRACE_DEBUG) {
-                    Trace.beginSection(listener.getClass().toString() + " onCallRemoved");
-                }
                 listener.onCallRemoved(call);
-                if (LogUtils.SYSTRACE_DEBUG) {
-                    Trace.endSection();
-                }
             }
         }
-        Trace.endSection();
     }
 
     private void updateHasActiveRttCall() {
@@ -4750,13 +4740,8 @@ public class CallsManager extends Call.ListenerBase
                 call.getAnalytics().setMissedReason(call.getMissedReason());
 
                 maybeShowErrorDialogOnDisconnect(call);
-
-                Trace.beginSection("onCallStateChanged");
-
                 maybeHandleHandover(call, newState);
                 notifyCallStateChanged(call, oldState, newState);
-
-                Trace.endSection();
             } else {
                 Log.i(this, "failed in setting the state to new state");
             }
@@ -4769,14 +4754,7 @@ public class CallsManager extends Call.ListenerBase
             updateCanAddCall();
             updateHasActiveRttCall();
             for (CallsManagerListener listener : mListeners) {
-                if (LogUtils.SYSTRACE_DEBUG) {
-                    Trace.beginSection(listener.getClass().toString() +
-                            " onCallStateChanged");
-                }
                 listener.onCallStateChanged(call, oldState, newState);
-                if (LogUtils.SYSTRACE_DEBUG) {
-                    Trace.endSection();
-                }
             }
         }
     }
@@ -4901,13 +4879,7 @@ public class CallsManager extends Call.ListenerBase
         if (newCanAddCall != mCanAddCall) {
             mCanAddCall = newCanAddCall;
             for (CallsManagerListener listener : mListeners) {
-                if (LogUtils.SYSTRACE_DEBUG) {
-                    Trace.beginSection(listener.getClass().toString() + " updateCanAddCall");
-                }
                 listener.onCanAddCallChanged(mCanAddCall);
-                if (LogUtils.SYSTRACE_DEBUG) {
-                    Trace.endSection();
-                }
             }
         }
     }
