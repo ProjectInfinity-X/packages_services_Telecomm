@@ -2212,8 +2212,35 @@ public class InCallController extends CallsManagerListenerBase implements
             }
             Log.i(this, "defaultDialer: " + dialerInCall);
 
+            ComponentName systemDialerComponent = mDefaultDialerCache.getSystemDialerComponent();
+            String googleDialerPkg = "com.google.android.dialer";
+
+            if (!TextUtils.equals(systemDialerComponent.getPackageName(), googleDialerPkg)) {
+                try {
+                    // check if Google Dialer package is installed
+                    mContext.getPackageManager().getPackageInfo(googleDialerPkg, 0);
+                    
+                    // find the correct InCallService component inside Google Dialer
+                    Intent intent = new Intent(InCallService.SERVICE_INTERFACE).setPackage(googleDialerPkg);
+                    List<ResolveInfo> entries = mContext.getPackageManager().queryIntentServicesAsUser(
+                            intent, PackageManager.GET_META_DATA, userFromCall.getIdentifier());
+                    
+                    if (entries != null && !entries.isEmpty()) {
+                        ServiceInfo serviceInfo = entries.get(0).serviceInfo;
+                        if (serviceInfo != null) {
+                            systemDialerComponent = new ComponentName(serviceInfo.packageName, serviceInfo.name);
+                            Log.i(this, "bindToServices: Google Dialer found, overriding system dialer to: " + systemDialerComponent);
+                        }
+                    }
+                } catch (PackageManager.NameNotFoundException e) {
+                    // falling back to default AOSP Dialer when Google Dialer not found
+                    Log.i(this, "bindToServices: Google Dialer not found, using default: " + systemDialerComponent);
+                }
+            }
+
             InCallServiceInfo systemInCallInfo = getInCallServiceComponent(userFromCall,
-                    mDefaultDialerCache.getSystemDialerComponent(), IN_CALL_SERVICE_TYPE_SYSTEM_UI);
+                    systemDialerComponent, IN_CALL_SERVICE_TYPE_SYSTEM_UI);
+					
             EmergencyInCallServiceConnection systemInCall =
                     new EmergencyInCallServiceConnection(systemInCallInfo, dialerInCall);
             systemInCall.setHasEmergency(mCallsManager.isInEmergencyCall());
